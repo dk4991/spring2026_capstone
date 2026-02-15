@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>定数与抉择 - 进阶版</title>
+    <style>
+        body, html {
+            margin: 0; padding: 0; overflow: hidden;
+            background-color: #0d0d0d;
+            font-family: "Microsoft YaHei", sans-serif;
+        }
+        #ui {
+            position: absolute; top: 20px; left: 20px; z-index: 10;
+            pointer-events: none; color: #e0e0e0;
+        }
+        .stat {
+            font-size: 16px; margin-bottom: 8px;
+            background: rgba(255,255,255,0.05);
+            padding: 10px 15px; border-radius: 4px;
+            border-left: 4px solid #00d4ff;
+        }
+        #msg { color: #ffb300; font-size: 14px; margin-top: 10px; }
+        #gameCanvas { display: block; cursor: crosshair; }
+        #overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 100; color: white; transition: opacity 1s;
+        }
+        .hidden { display: none !important; }
+        .result-box { text-align: center; padding: 50px; background: #1a1a1a; border-radius: 8px; }
+        button { margin-top: 20px; padding: 10px 25px; background: #00d4ff; border: none; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <div id="ui">
+        <div class="stat">生命历程: <span id="timer">0</span> 岁</div>
+        <div class="stat">红色机遇: <span id="score">0</span></div>
+        <div id="msg">提示：若被围死，可尝试双击相邻白棋以“弃子”开路</div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="overlay" class="hidden">
+        <div class="result-box">
+            <h2>生命轨迹已成定数</h2>
+            <p id="final-eval"></p>
+            <button onclick="location.reload()">开启下一世</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const timerEl = document.getElementById('timer');
+        const scoreEl = document.getElementById('score');
+        const msgEl = document.getElementById('msg');
+        const overlay = document.getElementById('overlay');
+        const evalEl = document.getElementById('final-eval');
+
+        const gridSize = 60;
+        let age = 0;
+        let score = 0;
+        let maxAge = 80 + Math.floor(Math.random() * 21);
+        let pieces = []; 
+        let activeDrop = null; 
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+
+        function init() {
+            resize();
+            for(let i=0; i<12; i++) addPiece('black');
+            for(let i=0; i<8; i++) addPiece('red');
+
+            const startX = Math.round((canvas.width / 2) / gridSize) * gridSize;
+            const startY = Math.round((canvas.height / 2) / gridSize) * gridSize;
+            activeDrop = { x: startX, y: startY, visualY: startY, state: 'floating' };
+        }
+
+        // 监听单击：落子
+        canvas.addEventListener('mousedown', (e) => {
+            if (age >= maxAge) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const targetX = Math.round((e.clientX - rect.left) / gridSize) * gridSize;
+            const targetY = Math.round((e.clientY - rect.top) / gridSize) * gridSize;
+
+            // 检查占用 (如果是红棋，允许覆盖并吃掉)
+            const existing = pieces.find(p => p.x === targetX && p.y === targetY);
+            if (existing && existing.type !== 'red') {
+                msgEl.innerText = "此处已有定数";
+                return;
+            }
+
+            // 邻域检查
+            if (activeDrop) {
+                const dx = Math.abs(targetX - activeDrop.x);
+                const dy = Math.abs(targetY - activeDrop.y);
+                if (dx > gridSize || dy > gridSize || (dx === 0 && dy === 0)) {
+                    msgEl.innerText = "请在邻近处落子";
+                    return;
+                }
+            }
+
+            // 成功落子
+            msgEl.innerText = "";
+            
+            // 固化旧子并尝试拾取红棋
+            if (activeDrop) {
+                checkRedCollection(activeDrop.x, activeDrop.y);
+                pieces.push({ x: activeDrop.x, y: activeDrop.y, type: 'white' });
+            }
+
+            // 特殊逻辑：如果目标位置本身是红棋，直接拾取
+            checkRedCollection(targetX, targetY);
+
+            activeDrop = { x: targetX, y: targetY, visualY: targetY - 100, state: 'falling' };
+            age++;
+            timerEl.innerText = age;
+            evolveWorld();
+        });
+
+        // 监听双击：弃子开路
+        canvas.addEventListener('dblclick', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const targetX = Math.round((e.clientX - rect.left) / gridSize) * gridSize;
+            const targetY = Math.round((e.clientY - rect.top) / gridSize) * gridSize;
+
+            const idx = pieces.findIndex(p => p.x === targetX && p.y === targetY && p.type === 'white');
+            if (idx !== -1) {
+                pieces.splice(idx, 1);
+                msgEl.innerText = "舍弃过去，换取新生";
+                age += 2; // 弃子代价：额外消耗2岁生命
+                timerEl.innerText = age;
+            }
+        });
+
+        function addPiece(type) {
+            const x = Math.floor(Math.random() * (canvas.width/gridSize)) * gridSize;
+            const y = Math.floor(Math.random() * (canvas.height/gridSize)) * gridSize;
+            if (!pieces.find(p => p.x === x && p.y === y)) {
+                pieces.push({ x, y, type });
+            }
+        }
+
+        function checkRedCollection(x, y) {
+            const idx = pieces.findIndex(p => p.type === 'red' && p.x === x && p.y === y);
+            if (idx !== -1) {
+                score++;
+                scoreEl.innerText = score;
+                pieces.splice(idx, 1); // 移除红子，代表拾取
+            }
+        }
+
+        function evolveWorld() {
+            if (Math.random() < 0.25) addPiece('black');
+            if (age % 10 === 0) {
+                let news = [];
+                pieces.filter(p => p.type === 'black').forEach(b => {
+                    if (Math.random() > 0.85) news.push({x: b.x + gridSize, y: b.y, type: 'black'});
+                });
+                pieces = [...pieces, ...news];
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.strokeStyle = "#1a1a1a";
+            for(let i=0; i<canvas.width; i+=gridSize) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,canvas.height); ctx.stroke(); }
+            for(let i=0; i<canvas.height; i+=gridSize) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(canvas.width,i); ctx.stroke(); }
+
+            pieces.forEach(p => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 18, 0, Math.PI*2);
+                if (p.type === 'white') {
+                    ctx.fillStyle = "#ffffff";
+                    ctx.shadowBlur = 10; ctx.shadowColor = "#fff";
+                } else if (p.type === 'black') {
+                    ctx.fillStyle = "#000";
+                    ctx.shadowBlur = 0;
+                    ctx.strokeStyle = "#333"; ctx.stroke();
+                } else if (p.type === 'red') {
+                    ctx.fillStyle = "#ff1a1a";
+                    ctx.shadowBlur = 20; ctx.shadowColor = "red";
+                }
+                ctx.fill();
+            });
+
+            if (activeDrop) {
+                if (activeDrop.state === 'falling' && activeDrop.visualY < activeDrop.y) activeDrop.visualY += 12;
+                let grad = ctx.createRadialGradient(activeDrop.x-5, activeDrop.visualY-5, 2, activeDrop.x, activeDrop.visualY, 18);
+                grad.addColorStop(0, "#c8e6ff"); grad.addColorStop(1, "#0096ff");
+                ctx.beginPath();
+                ctx.arc(activeDrop.x, activeDrop.visualY, 20, 0, Math.PI*2);
+                ctx.fillStyle = grad;
+                ctx.shadowBlur = 15; ctx.shadowColor = "#00d4ff";
+                ctx.fill();
+
+                // 范围提示
+                ctx.strokeStyle = "rgba(0, 212, 255, 0.15)";
+                ctx.strokeRect(activeDrop.x - gridSize - 20, activeDrop.y - gridSize - 20, gridSize*2 + 40, gridSize*2 + 40);
+            }
+
+            if (age < maxAge) requestAnimationFrame(draw);
+            else {
+                overlay.classList.remove('hidden');
+                evalEl.innerText = `你在 ${age} 岁终结了这场棋局。共拾取了 ${score} 个红色机遇。`;
+            }
+        }
+
+        window.addEventListener('resize', resize);
+        init();
+        draw();
+    </script>
+</body>
+</html>
