@@ -2,52 +2,39 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>定数与抉择 - 进阶版</title>
+    <title>生命轨迹：因缘与宿命</title>
     <style>
-        body, html {
-            margin: 0; padding: 0; overflow: hidden;
-            background-color: #0d0d0d;
-            font-family: "Microsoft YaHei", sans-serif;
-        }
-        #ui {
-            position: absolute; top: 20px; left: 20px; z-index: 10;
-            pointer-events: none; color: #e0e0e0;
-        }
-        .stat {
-            font-size: 16px; margin-bottom: 8px;
-            background: rgba(255,255,255,0.05);
-            padding: 10px 15px; border-radius: 4px;
-            border-left: 4px solid #00d4ff;
-        }
-        #msg { color: #ffb300; font-size: 14px; margin-top: 10px; }
+        body, html { margin: 0; padding: 0; overflow: hidden; background-color: #f5eedf; font-family: "PingFang SC", "STHeiti", sans-serif; }
+        #ui { position: absolute; top: 20px; left: 20px; z-index: 10; pointer-events: none; color: #5a4a3a; }
+        .stat { font-size: 14px; margin-bottom: 8px; background: rgba(0,0,0,0.05); padding: 8px 12px; border-left: 3px solid #8b572a; }
+        #restart-btn { position: absolute; top: 20px; right: 20px; z-index: 110; padding: 10px 25px; background: #8b572a; color: #fff; border: none; cursor: pointer; border-radius: 25px; font-size: 14px; pointer-events: auto; }
         #gameCanvas { display: block; cursor: crosshair; }
-        #overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9);
-            display: flex; justify-content: center; align-items: center;
-            z-index: 100; color: white; transition: opacity 1s;
-        }
+        #overlay { position: fixed; bottom: 30px; right: 30px; width: 400px; max-height: 85%; background: rgba(255, 253, 247, 0.98); border: 1px solid #d2b48c; z-index: 100; color: #4a3e2e; display: flex; flex-direction: column; padding: 25px; border-radius: 15px; box-shadow: 0 15px 45px rgba(0,0,0,0.1); transition: all 0.6s; }
         .hidden { display: none !important; }
-        .result-box { text-align: center; padding: 50px; background: #1a1a1a; border-radius: 8px; }
-        button { margin-top: 20px; padding: 10px 25px; background: #00d4ff; border: none; cursor: pointer; }
+        .minimized { width: 160px !important; height: 50px !important; overflow: hidden; padding: 10px !important; opacity: 0.8; }
+        .scroll-container { flex-grow: 1; overflow-y: auto; padding-right: 10px; }
+        .event-item { padding: 20px 0; border-bottom: 1px dashed #e6dec9; font-size: 13.5px; line-height: 1.8; }
+        .age-tag { color: #8b572a; font-weight: bold; margin-right: 12px; }
+        .toggle-view { cursor: pointer; color: #8b572a; font-size: 12px; font-weight: bold; text-align: right; text-decoration: underline; margin-bottom: 10px; pointer-events: auto; }
+        h2 { font-weight: 300; letter-spacing: 2px; color: #333; margin-top: 0; text-align: center; font-size: 20px; }
     </style>
 </head>
 <body>
 
+    <button id="restart-btn" onclick="location.reload()">再历因缘</button>
+
     <div id="ui">
-        <div class="stat">生命历程: <span id="timer">0</span> 岁</div>
-        <div class="stat">红色机遇: <span id="score">0</span></div>
-        <div id="msg">提示：若被围死，可尝试双击相邻白棋以“弃子”开路</div>
+        <div class="stat">岁数: <span id="timer">0</span></div>
+        <div class="stat">心境: <span id="score">0</span></div>
     </div>
 
     <canvas id="gameCanvas"></canvas>
     
     <div id="overlay" class="hidden">
-        <div class="result-box">
-            <h2>生命轨迹已成定数</h2>
-            <p id="final-eval"></p>
-            <button onclick="location.reload()">开启下一世</button>
+        <div class="toggle-view" onclick="document.getElementById('overlay').classList.toggle('minimized')">[ 观察轨迹 / 生命纪实 ]</div>
+        <div class="scroll-container">
+            <h2 id="death-title">大限已至，因缘归位</h2>
+            <div id="chronicle-list" class="chronicle"></div>
         </div>
     </div>
 
@@ -56,167 +43,191 @@
         const ctx = canvas.getContext('2d');
         const timerEl = document.getElementById('timer');
         const scoreEl = document.getElementById('score');
-        const msgEl = document.getElementById('msg');
         const overlay = document.getElementById('overlay');
-        const evalEl = document.getElementById('final-eval');
+        const chronicleList = document.getElementById('chronicle-list');
 
         const gridSize = 60;
-        let age = 0;
-        let score = 0;
-        let maxAge = 80 + Math.floor(Math.random() * 21);
-        let pieces = []; 
-        let activeDrop = null; 
+        let age = 0; let score = 0;
+        let maxAge = 82 + Math.floor(Math.random() * 6); 
+        let pieces = []; let activeDrop = null; 
+        let history = []; let isEnded = false;
+        let fateCenter = { x: 0, y: 0 };
+        let lineProgress = 0; let lineAlpha = 0.6; let alphaDir = -0.01;
 
-        function resize() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
+        // 状态与事件唯一性管理
+        const lifeState = { marriage: false, children: 0, house: false, tragedyCount: 0 };
+        const usedEvents = new Set();
+
+        const eventPool = {
+            infant: [ // 0-12岁
+                "你在长辈的搀扶下摇晃着迈出第一步，世界在你眼中瞬间变得辽阔",
+                "你在老屋后的泥地里发现了一只受伤的麻雀，第一次对‘弱小’生出悲悯",
+                "你换牙那天把牙齿郑重地扔向房顶，满心期待着长大的模样",
+                "你第一次在深夜听见父母低声讨论柴米油盐，隐约察觉到生活的重力"
+            ],
+            teen: [ // 13-18岁
+                "你站在操场中央，为校赛的进球纵情欢呼，那是青春里最纯粹的骄傲",
+                "你在昏黄的灯下给邻桌写了一封未寄出的信，纸页里藏着夏天的风",
+                "你在一场大雪后与好友在车站分别，第一次领略到‘远方’带来的惆怅",
+                "你熬夜读完了一本改变人生观的书，内心原本散乱的星火开始凝聚"
+            ],
+            young: [ // 19-35岁
+                "你拿到了第一笔微薄的薪水，在陌生的街头买了一份并不算丰盛的晚餐奖励自己",
+                "你独自背着包去了一座从未去过的城市，在午夜的车站确认了自由的孤独",
+                "你通过无数个通宵的努力赢得了职场上的第一次认可，心境自此不同",
+                "你在一场简朴而温馨的仪式上与挚爱交换了戒指，从此生命有了归宿",
+                "你看着新生命的降临，那种血脉连接的震颤让你彻底理解了责任二字"
+            ],
+            middle: [ // 36-55岁
+                "你经过多年积攒签下了房产合同，终于在钢铁森林里拥有了属于自己的坐标",
+                "你带着父母去了一趟远方旅行，看着他们因惊喜而局促的神情，你心中满是温情",
+                "你重拾了年轻时搁置的爱好，在喧嚣的岁月里为自己开辟了一方静谧的田地",
+                "你看着孩子独立步入社会，那种作为‘引路人’的使命感终于在此刻圆满"
+            ],
+            senior: [ // 56+岁
+                "你开始习惯在公园的长椅上看落叶精准地坠地，体悟顺其自然的静美",
+                "你整理旧物时翻出了多年前的戏票，字迹已随岁月散去，你只记得那天的风很轻",
+                "你在黄昏的摇椅上与一生的起伏相对，发现那些曾经的波澜早已化作通透的平静",
+                "你在晚年重拾笔墨，笔触间流淌的是沉淀了一生的宁静与豁达"
+            ],
+            tragedy: [ // 消极（仅限一次）
+                "你遭遇了一次沉重的职场背叛，这种寒意让你重新审视人性的边界",
+                "你经历了一场突如其来的财务变故，虽然元气大伤，但也在废墟中学会了坚韧",
+                "一场大病让你卧床数月，这种与死神的擦肩，让你看清了万物的序位"
+            ]
+        };
+
+        function getLifeNarrative(age) {
+            let pool = [];
+            if (lifeState.tragedyCount < 1 && Math.random() < 0.1) {
+                pool = eventPool.tragedy;
+                lifeState.tragedyCount++;
+            } else {
+                if (age <= 12) pool = eventPool.infant;
+                else if (age <= 18) pool = eventPool.teen;
+                else if (age <= 35) pool = eventPool.young;
+                else if (age <= 55) pool = eventPool.middle;
+                else pool = eventPool.senior;
+            }
+
+            // 过滤掉已使用的事件
+            const available = pool.filter(e => !usedEvents.has(e));
+            if (available.length === 0) return "这一岁，你平静地度过，在平淡的琐碎中体味着岁月的流金。";
+
+            const selected = available[Math.floor(Math.random() * available.length)];
+            usedEvents.add(selected);
+            return selected;
         }
+
+        function getDeathEvent() {
+            return `在 ${age} 岁这一年，你感觉到体内的那股气劲慢慢散去。你并不感到恐惧，只是静静凝视着这张由白、黑、红棋子交织而成的棋盘。你发现，那条朱砂色的线条早已将所有破碎的瞬间连接成了一幅宏大的作品。你安详地闭上眼，完成了对虚无的最后一次回应。`;
+        }
+
+        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
 
         function init() {
             resize();
-            for(let i=0; i<12; i++) addPiece('black');
-            for(let i=0; i<8; i++) addPiece('red');
-
-            const startX = Math.round((canvas.width / 2) / gridSize) * gridSize;
-            const startY = Math.round((canvas.height / 2) / gridSize) * gridSize;
+            fateCenter = { x: canvas.width / 2, y: canvas.height / 2 };
+            // 初始宿命轨道（100颗）
+            for(let i=0; i<100; i++) {
+                const a = i * 0.45; const d = i * 15;
+                const x = Math.round((fateCenter.x + Math.cos(a)*d)/gridSize)*gridSize;
+                const y = Math.round((fateCenter.y + Math.sin(a)*d)/gridSize)*gridSize;
+                if(!pieces.find(p => p.x === x && p.y === y)) pieces.push({x, y, type:'black'});
+            }
+            generateOrbs();
+            const startX = Math.round((canvas.width/2)/gridSize)*gridSize;
+            const startY = Math.round((canvas.height/2)/gridSize)*gridSize;
+            pieces = pieces.filter(p => !(p.x === startX && p.y === startY));
             activeDrop = { x: startX, y: startY, visualY: startY, state: 'floating' };
+            draw();
         }
 
-        // 监听单击：落子
+        function generateOrbs() {
+            pieces = pieces.filter(p => p.type === 'black' || p.type === 'white');
+            for(let i=0; i<10; i++) {
+                const x = Math.floor(Math.random() * (canvas.width/gridSize)) * gridSize;
+                const y = Math.floor(Math.random() * (canvas.height/gridSize)) * gridSize;
+                if (!pieces.find(p => p.x === x && p.y === y)) pieces.push({ x, y, type: 'mystery' });
+            }
+        }
+
         canvas.addEventListener('mousedown', (e) => {
-            if (age >= maxAge) return;
-
+            if (isEnded) return;
             const rect = canvas.getBoundingClientRect();
-            const targetX = Math.round((e.clientX - rect.left) / gridSize) * gridSize;
-            const targetY = Math.round((e.clientY - rect.top) / gridSize) * gridSize;
-
-            // 检查占用 (如果是红棋，允许覆盖并吃掉)
-            const existing = pieces.find(p => p.x === targetX && p.y === targetY);
-            if (existing && existing.type !== 'red') {
-                msgEl.innerText = "此处已有定数";
-                return;
-            }
-
-            // 邻域检查
-            if (activeDrop) {
-                const dx = Math.abs(targetX - activeDrop.x);
-                const dy = Math.abs(targetY - activeDrop.y);
-                if (dx > gridSize || dy > gridSize || (dx === 0 && dy === 0)) {
-                    msgEl.innerText = "请在邻近处落子";
-                    return;
-                }
-            }
-
-            // 成功落子
-            msgEl.innerText = "";
+            const tx = Math.round((e.clientX - rect.left)/gridSize)*gridSize;
+            const ty = Math.round((e.clientY - rect.top)/gridSize)*gridSize;
+            const target = pieces.find(p => p.x === tx && p.y === ty);
+            const dx = Math.abs(tx - activeDrop.x); const dy = Math.abs(ty - activeDrop.y);
             
-            // 固化旧子并尝试拾取红棋
-            if (activeDrop) {
-                checkRedCollection(activeDrop.x, activeDrop.y);
-                pieces.push({ x: activeDrop.x, y: activeDrop.y, type: 'white' });
+            if (dx > gridSize || dy > gridSize || (dx === 0 && dy === 0)) return;
+            if (target && target.type === 'white') { activeDrop = { x: tx, y: ty, visualY: ty, state: 'floating' }; return; }
+            if (target && target.type === 'black') return;
+
+            pieces.push({ x: activeDrop.x, y: activeDrop.y, type: 'white', order: age });
+            if (target && target.type === 'mystery') {
+                pieces = pieces.filter(p => p !== target);
+                score += (Math.random() > 0.4 ? 2 : -2);
+                history.push({ age: age, desc: getLifeNarrative(age) });
             }
 
-            // 特殊逻辑：如果目标位置本身是红棋，直接拾取
-            checkRedCollection(targetX, targetY);
+            activeDrop = { x: tx, y: ty, visualY: ty - 100, state: 'falling' };
+            age++; timerEl.innerText = age;
 
-            activeDrop = { x: targetX, y: targetY, visualY: targetY - 100, state: 'falling' };
-            age++;
-            timerEl.innerText = age;
-            evolveWorld();
-        });
-
-        // 监听双击：弃子开路
-        canvas.addEventListener('dblclick', (e) => {
-            const rect = canvas.getBoundingClientRect();
-            const targetX = Math.round((e.clientX - rect.left) / gridSize) * gridSize;
-            const targetY = Math.round((e.clientY - rect.top) / gridSize) * gridSize;
-
-            const idx = pieces.findIndex(p => p.x === targetX && p.y === targetY && p.type === 'white');
-            if (idx !== -1) {
-                pieces.splice(idx, 1);
-                msgEl.innerText = "舍弃过去，换取新生";
-                age += 2; // 弃子代价：额外消耗2岁生命
-                timerEl.innerText = age;
-            }
-        });
-
-        function addPiece(type) {
-            const x = Math.floor(Math.random() * (canvas.width/gridSize)) * gridSize;
-            const y = Math.floor(Math.random() * (canvas.height/gridSize)) * gridSize;
-            if (!pieces.find(p => p.x === x && p.y === y)) {
-                pieces.push({ x, y, type });
-            }
-        }
-
-        function checkRedCollection(x, y) {
-            const idx = pieces.findIndex(p => p.type === 'red' && p.x === x && p.y === y);
-            if (idx !== -1) {
-                score++;
-                scoreEl.innerText = score;
-                pieces.splice(idx, 1); // 移除红子，代表拾取
-            }
-        }
-
-        function evolveWorld() {
-            if (Math.random() < 0.25) addPiece('black');
             if (age % 10 === 0) {
-                let news = [];
-                pieces.filter(p => p.type === 'black').forEach(b => {
-                    if (Math.random() > 0.85) news.push({x: b.x + gridSize, y: b.y, type: 'black'});
-                });
-                pieces = [...pieces, ...news];
+                fateCenter = { x: Math.random()*canvas.width, y: Math.random()*canvas.height };
+                generateOrbs();
             }
+            if (age >= maxAge) finishGame();
+        });
+
+        function finishGame() {
+            isEnded = true;
+            history.push({ age: age, desc: getDeathEvent() });
+            overlay.classList.remove('hidden');
+            chronicleList.innerHTML = history.map(ev => `<div class="event-item"><span class="age-tag">${ev.age} 岁</span>${ev.desc}</div>`).join('');
         }
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            ctx.strokeStyle = "#1a1a1a";
-            for(let i=0; i<canvas.width; i+=gridSize) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,canvas.height); ctx.stroke(); }
-            for(let i=0; i<canvas.height; i+=gridSize) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(canvas.width,i); ctx.stroke(); }
+            ctx.strokeStyle = "rgba(139, 91, 42, 0.05)";
+            for(let i=0; i<canvas.width; i+=gridSize){ ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,canvas.height); ctx.stroke(); }
+            for(let i=0; i<canvas.height; i+=gridSize){ ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(canvas.width,i); ctx.stroke(); }
+
+            const whites = pieces.filter(p => p.type === 'white').sort((a,b) => a.order - b.order);
+            if (whites.length > 1) {
+                ctx.beginPath(); ctx.strokeStyle = `rgba(139, 42, 42, ${lineAlpha})`; ctx.lineWidth = 4;
+                ctx.moveTo(whites[0].x, whites[0].y);
+                const limit = isEnded ? Math.floor(lineProgress * (whites.length - 1)) : whites.length - 1;
+                for(let i=1; i<=limit; i++) ctx.lineTo(whites[i].x, whites[i].y);
+                ctx.stroke();
+                if(isEnded) {
+                    if(lineProgress < 1) lineProgress += 0.015;
+                    lineAlpha += alphaDir; if(lineAlpha < 0.2 || lineAlpha > 0.8) alphaDir *= -1;
+                }
+            }
 
             pieces.forEach(p => {
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, 18, 0, Math.PI*2);
-                if (p.type === 'white') {
-                    ctx.fillStyle = "#ffffff";
-                    ctx.shadowBlur = 10; ctx.shadowColor = "#fff";
-                } else if (p.type === 'black') {
-                    ctx.fillStyle = "#000";
-                    ctx.shadowBlur = 0;
-                    ctx.strokeStyle = "#333"; ctx.stroke();
-                } else if (p.type === 'red') {
-                    ctx.fillStyle = "#ff1a1a";
-                    ctx.shadowBlur = 20; ctx.shadowColor = "red";
+                ctx.beginPath(); ctx.arc(p.x, p.y, 14, 0, Math.PI*2);
+                if (p.type === 'white') { ctx.fillStyle = "#fff"; ctx.shadowBlur = 8; ctx.shadowColor = "#fff"; }
+                else if (p.type === 'black') { ctx.fillStyle = "#2c2825"; }
+                else if (p.type === 'mystery') { 
+                    ctx.strokeStyle = "#8b572a"; ctx.strokeRect(p.x-10, p.y-10, 20, 20); 
+                    ctx.fillStyle = "#8b572a"; ctx.font = "12px sans-serif"; ctx.fillText("?", p.x-4, p.y+4);
                 }
-                ctx.fill();
+                ctx.fill(); ctx.shadowBlur = 0;
             });
 
-            if (activeDrop) {
+            if (activeDrop && !isEnded) {
                 if (activeDrop.state === 'falling' && activeDrop.visualY < activeDrop.y) activeDrop.visualY += 12;
-                let grad = ctx.createRadialGradient(activeDrop.x-5, activeDrop.visualY-5, 2, activeDrop.x, activeDrop.visualY, 18);
-                grad.addColorStop(0, "#c8e6ff"); grad.addColorStop(1, "#0096ff");
-                ctx.beginPath();
-                ctx.arc(activeDrop.x, activeDrop.visualY, 20, 0, Math.PI*2);
-                ctx.fillStyle = grad;
-                ctx.shadowBlur = 15; ctx.shadowColor = "#00d4ff";
-                ctx.fill();
-
-                // 范围提示
-                ctx.strokeStyle = "rgba(0, 212, 255, 0.15)";
-                ctx.strokeRect(activeDrop.x - gridSize - 20, activeDrop.y - gridSize - 20, gridSize*2 + 40, gridSize*2 + 40);
+                ctx.beginPath(); ctx.arc(activeDrop.x, activeDrop.visualY, 18, 0, Math.PI*2);
+                ctx.fillStyle = "#00b4d8"; ctx.fill();
             }
-
-            if (age < maxAge) requestAnimationFrame(draw);
-            else {
-                overlay.classList.remove('hidden');
-                evalEl.innerText = `你在 ${age} 岁终结了这场棋局。共拾取了 ${score} 个红色机遇。`;
-            }
+            requestAnimationFrame(draw);
         }
 
-        window.addEventListener('resize', resize);
+        window.addEventListener('resize', () => { resize(); draw(); });
         init();
-        draw();
     </script>
 </body>
 </html>
