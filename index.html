@@ -36,18 +36,18 @@
                 <h2 class="lang-en">Table of Contents</h2>
                 <h2 class="lang-zh hidden">目录</h2>
                 <ul class="toc-list">
-                    <li onclick="app.goToPage(3)">1. Life Trajectory / 1. 生命轨迹</li>
+                    <li onclick="app.goToPage(3)">1. Life Trajectory</li>
                 </ul>
             </div>
             <div class="right-page page-content">
                 <h3 class="lang-en">Temporarily confirmed</h3>
                 <h3 class="lang-zh hidden">暂定</h3>
                 <ul class="toc-list-secondary">
-                    <li>1. Time / 时间</li>
-                    <li>2. Desire / 欲望</li>
-                    <li>3. Communication / 沟通 (skills, negotiation, game theory)</li>
-                    <li>4. The Power of Now / 当下的力量</li>
-                    <li>5. Fireworks melting into snow / 烟花化雪</li>
+                    <li>1. Time</li>
+                    <li>2. Desire</li>
+                    <li>3. Communication (skills, negotiation, game theory)</li>
+                    <li>4. The Power of Now</li>
+                    <li>5. Fireworks melting into snow</li>
                 </ul>
             </div>
         </section>
@@ -72,7 +72,7 @@
             </div>
             <div class="right-page page-content">
                 <div class="top-icons right-align">
-                    <span class="icon" onclick="window.open('game.html', '_blank')" title="Play Game">🎮</span>
+                    <span class="icon" onclick="window.open('game.html?lang=' + app.currentLang, '_blank')" title="Play Game">🎮</span>
                     <span class="icon" onclick="app.speakText('page-3')" title="Read Aloud">📢</span>
                 </div>
                 
@@ -108,8 +108,8 @@
             </div>
             <div class="right-page page-content">
                 <div class="top-icons right-align">
-                    <span class="icon" onclick="window.open('game.html', '_blank')">🎮</span>
-                    <span class="icon" onclick="app.speakText('page-4')">📢</span>
+                    <span class="icon" onclick="window.open('game.html?lang=' + app.currentLang, '_blank')" title="Play Game">🎮</span>
+                    <span class="icon" onclick="app.speakText('page-4')" title="Read Aloud">📢</span>
                 </div>
                 <h2>Content Analysis</h2>
                 <div class="text-container large-text" id="p4-text">
@@ -138,8 +138,8 @@
             </div>
             <div class="right-page page-content">
                 <div class="top-icons right-align">
-                    <span class="icon" onclick="window.open('game.html', '_blank')">🎮</span>
-                    <span class="icon" onclick="app.speakText('page-5')">📢</span>
+                    <span class="icon" onclick="window.open('game.html?lang=' + app.currentLang, '_blank')" title="Play Game">🎮</span>
+                    <span class="icon" onclick="app.speakText('page-5')" title="Read Aloud">📢</span>
                 </div>
                 <h2>Content Analysis</h2>
                 <div class="text-container">
@@ -223,8 +223,9 @@
                         (And others as listed in source document...)
                     </p>
                 </div>
-                <div class="nav-icon-bottom-right" onclick="app.goToPage(1)">🏠 Start</div>
+                </div>
             </div>
+            <div class="nav-icon-bottom-right" onclick="app.goToPage(1)" style="position: absolute; bottom: 30px; right: 40px; z-index: 10;">🏠 Start</div>
         </section>
 
     </div>

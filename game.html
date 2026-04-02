@@ -22,6 +22,14 @@
         #overlay { position: fixed; bottom: 30px; right: 30px; width: 400px; max-height: 85%; background: rgba(255, 253, 247, 0.98); border: 1px solid #d2b48c; z-index: 100; color: #4a3e2e; display: flex; flex-direction: column; padding: 25px; border-radius: 15px; box-shadow: 0 15px 45px rgba(0,0,0,0.1); transition: all 0.6s; }
         .hidden { display: none !important; }
         .minimized { width: 160px !important; height: 50px !important; overflow: hidden; padding: 10px !important; opacity: 0.8; }
+        
+        /* Overlay styles */
+        #instruction-overlay { position: fixed; top:0; left:0; width: 100%; height: 100%; background: rgba(11, 15, 25, 0.85); z-index: 200; display: flex; justify-content: center; align-items: center; }
+        .instruction-content { background: #fffbf0; border-radius: 15px; padding: 40px; max-width: 500px; color: #4a3e2e; box-shadow: 0 20px 50px rgba(0,0,0,0.5); border: 1px solid #dcd3b6; }
+        .instruction-content h2 { color: #8b572a; margin-bottom: 20px; font-weight: 400; font-size: 24px; text-align: center; }
+        .instruction-content p, .instruction-content li { margin-bottom: 12px; font-size: 15px; line-height: 1.6; }
+        .instruction-content ul { padding-left: 20px; margin-bottom: 20px; }
+        #start-game-btn { display: block; width: 100%; margin-top: 25px; font-size: 16px; padding: 15px; border-radius: 30px; }
         .scroll-container { flex-grow: 1; overflow-y: auto; padding-right: 10px; }
         .event-item { padding: 20px 0; border-bottom: 1px dashed #e6dec9; font-size: 13.5px; line-height: 1.8; }
         .age-tag { color: #8b572a; font-weight: bold; margin-right: 12px; }
@@ -32,7 +40,7 @@
 <body>
 
     <div id="controls">
-        <button id="lang-btn" class="btn" onclick="toggleLanguage()">EN / 中文</button>
+        <button class="btn" id="back-btn" onclick="window.close(); if(!window.closed) location.href='index.html';">&#8592; Back</button>
         <button id="restart-btn" class="btn" onclick="location.reload()">再历因缘 / Revisit</button>
     </div>
 
@@ -55,6 +63,15 @@
         </div>
     </div>
 
+    <!-- Instruction Overlay -->
+    <div id="instruction-overlay">
+        <div class="instruction-content">
+            <h2 id="inst-title">Rules</h2>
+            <div id="inst-text"></div>
+            <button id="start-game-btn" class="btn">Start Game</button>
+        </div>
+    </div>
+
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
@@ -65,19 +82,47 @@
         const overlay = document.getElementById('overlay');
         const chronicleList = document.getElementById('chronicle-list');
 
-        let currentLang = 'zh'; 
+        const urlParams = new URLSearchParams(window.location.search);
+        let currentLang = urlParams.get('lang') || 'en'; 
+        
         const i18n = {
             zh: {
-                age: "岁数", mind: "心境", restart: "再历因缘", wait: "人生如电",
+                age: "岁数", mind: "心境", restart: "再历因缘", wait: "人生如电", back: "← 返回",
                 toggle: "[ 观察轨迹 / 生命纪实 ]", death: "大限已至，因缘归位",
                 unit: "岁", defaultEvent: "这一岁，你平静地度过，在平淡的琐碎中体味着岁月的流金。",
-                deathDesc: (age) => `在 ${age} 岁这一年，你感觉到体内的那股气劲慢慢散去。朱砂色的线条早已将所有破碎的瞬间连接。你安详地闭上眼。`
+                deathDesc: (age) => `在 ${age} 岁这一年，你感觉到体内的那股气劲慢慢散去。朱砂色的线条早已将所有破碎的瞬间连接。你安详地闭上眼。`,
+                instTitle: "生命轨迹：规则",
+                instText: `
+                    <p>1. <b>点击</b>相邻的网格点（避开黑色障碍）落下白子并推进你的生命轨迹。</p>
+                    <p>2. 时光流逝：每个回合有<b>5秒倒计时</b>。若不操作，命运将替你抉择。</p>
+                    <p>3. 在棋盘上游走，你将会遭遇不同的命运节点：</p>
+                    <ul>
+                        <li><span style="color:#2a8b2a; font-weight:bold;">● (绿色圈)</span>: 顺境与好机遇 (+)。</li>
+                        <li><span style="color:#8b2a2a; font-weight:bold;">▲ (深红色)</span>: 逆境与差机遇 (-)。</li>
+                        <li><span style="color:#8b572a; font-weight:bold;">■ (棕色框)</span>: 未知的盲盒 (?)。</li>
+                    </ul>
+                    <p>4. <b>十年大运</b>: 每过十年，运势轮转，棋盘上的障碍将随之重组。</p>
+                `,
+                instBtn: "我明白了，开始体验"
             },
             en: {
-                age: "Age", mind: "Mindset", restart: "Revisit Fate", wait: "Life is Short",
+                age: "Age", mind: "Mindset", restart: "Revisit Fate", wait: "Life is Short", back: "← Back",
                 toggle: "[ Observe Path / Life Chronicles ]", death: "The End has Arrived; Karma Returns",
                 unit: "Age", defaultEvent: "This year passes quietly, savoring the flow of time.",
-                deathDesc: (age) => `At age ${age}, you feel the energy dissipate. The cinnabar line has connected every moment. You close your eyes.`
+                deathDesc: (age) => `At age ${age}, you feel the energy dissipate. The cinnabar line has connected every moment. You close your eyes.`,
+                instTitle: "Life Trajectory: Rules",
+                instText: `
+                    <p>1. <b>Click</b> on any adjacent grid point (excluding black obstacles) to place a white piece and advance your life trajectory.</p>
+                    <p>2. Time is clicking: a <b>5-second timer</b> forces your hand. If you do not move, fate will choose for you.</p>
+                    <p>3. As you navigate the board, you will encounter different nodes of fate:</p>
+                    <ul>
+                        <li><span style="color:#2a8b2a; font-weight:bold;">● (Green Circle)</span>: A good opportunity (+).</li>
+                        <li><span style="color:#8b2a2a; font-weight:bold;">▲ (Dark Red)</span>: A difficult event (-).</li>
+                        <li><span style="color:#8b572a; font-weight:bold;">■ (Brown Box)</span>: An unknown mystery (?).</li>
+                    </ul>
+                    <p>4. <b>10-Year Cycle</b>: Every ten years, your luck cycle changes, reshaping the labyrinth of black obstacles.</p>
+                `,
+                instBtn: "I Understand, Start Game"
             }
         };
 
@@ -113,10 +158,7 @@
         const AUTO_LIMIT = 5000; 
         let lastActionTime = Date.now();
 
-        function toggleLanguage() {
-            currentLang = currentLang === 'zh' ? 'en' : 'zh';
-            updateUI();
-        }
+        let gameStarted = false;
 
         function updateUI() {
             const lang = i18n[currentLang];
@@ -124,8 +166,12 @@
             document.getElementById('label-mind').innerText = lang.mind;
             document.getElementById('label-wait').innerText = lang.wait;
             document.getElementById('restart-btn').innerText = lang.restart;
+            document.getElementById('back-btn').innerText = lang.back;
             document.getElementById('toggle-text').innerText = lang.toggle;
             document.getElementById('death-title').innerText = lang.death;
+            document.getElementById('inst-title').innerText = lang.instTitle;
+            document.getElementById('inst-text').innerHTML = lang.instText;
+            document.getElementById('start-game-btn').innerText = lang.instBtn;
             if (isEnded || history.length > 0) renderChronicle();
         }
 
@@ -163,13 +209,14 @@
         function init() {
             resize();
             updateUI();
-            fateCenter = { x: canvas.width / 2, y: canvas.height / 2 };
-            for(let i=0; i<100; i++) {
-                const a = i * 0.45; const d = i * 15;
-                const x = Math.round((fateCenter.x + Math.cos(a)*d)/gridSize)*gridSize;
-                const y = Math.round((fateCenter.y + Math.sin(a)*d)/gridSize)*gridSize;
-                if(!pieces.find(p => p.x === x && p.y === y)) pieces.push({x, y, type:'black'});
-            }
+            
+            document.getElementById('start-game-btn').addEventListener('click', () => {
+                document.getElementById('instruction-overlay').classList.add('hidden');
+                gameStarted = true;
+                lastActionTime = Date.now();
+            });
+
+            generateObstacles();
             generateOrbs();
             const startX = Math.round((canvas.width/2)/gridSize)*gridSize;
             const startY = Math.round((canvas.height/2)/gridSize)*gridSize;
@@ -178,13 +225,30 @@
             lastActionTime = Date.now();
             draw();
         }
+        
+        function generateObstacles() {
+            pieces = pieces.filter(p => p.type !== 'black');
+            fateCenter = { x: Math.random()*canvas.width, y: Math.random()*canvas.height };
+            for(let i=0; i<100; i++) {
+                const a = i * 0.45; const d = i * 15;
+                const x = Math.round((fateCenter.x + Math.cos(a)*d)/gridSize)*gridSize;
+                const y = Math.round((fateCenter.y + Math.sin(a)*d)/gridSize)*gridSize;
+                if(!pieces.find(p => p.x === x && p.y === y)) pieces.push({x, y, type:'black'});
+            }
+        }
 
         function generateOrbs() {
-            pieces = pieces.filter(p => p.type !== 'mystery');
-            for(let i=0; i<12; i++) {
+            pieces = pieces.filter(p => !['mystery', 'good', 'bad'].includes(p.type));
+            for(let i=0; i<18; i++) {
                 const x = Math.floor(Math.random() * (canvas.width/gridSize)) * gridSize;
                 const y = Math.floor(Math.random() * (canvas.height/gridSize)) * gridSize;
-                if (!pieces.find(p => p.x === x && p.y === y)) pieces.push({ x, y, type: 'mystery' });
+                if (!pieces.find(p => p.x === x && p.y === y)) {
+                    let type = 'mystery';
+                    const rand = Math.random();
+                    if (rand < 0.3) type = 'good';
+                    else if (rand < 0.6) type = 'bad';
+                    pieces.push({ x, y, type });
+                }
             }
         }
 
@@ -195,9 +259,11 @@
             // 只有当目标不是白色棋子时，才将旧位置转为白色并增加年龄（即生命前进）
             if (!target || target.type !== 'white') {
                 pieces.push({ x: activeDrop.x, y: activeDrop.y, type: 'white', order: age });
-                if (target && target.type === 'mystery') {
+                if (target && ['mystery', 'good', 'bad'].includes(target.type)) {
                     pieces = pieces.filter(p => p !== target);
-                    score += (Math.random() > 0.4 ? 2 : -2);
+                    if (target.type === 'good') score += 2;
+                    else if (target.type === 'bad') score -= 2;
+                    else score += (Math.random() > 0.4 ? 2 : -2); // mystery
                     history.push({ age: age, desc: getLifeNarrative(age), isDeath: false });
                 }
                 age++;
@@ -209,8 +275,8 @@
             activeDrop = { x: tx, y: ty, visualY: ty - 100, state: 'falling' };
             lastActionTime = Date.now();
 
-            if (age % 10 === 0 && age > 0) {
-                fateCenter = { x: Math.random()*canvas.width, y: Math.random()*canvas.height };
+            if (age % 10 === 0 && age > 0 && (!target || target.type !== 'white')) {
+                generateObstacles();
                 generateOrbs();
             }
             if (age >= maxAge) finishGame();
@@ -274,17 +340,28 @@
             }
 
             pieces.forEach(p => {
-                ctx.beginPath(); ctx.arc(p.x, p.y, 14, 0, Math.PI*2);
-                if (p.type === 'white') { ctx.fillStyle = "#fff"; ctx.shadowBlur = 8; ctx.shadowColor = "#fff"; }
-                else if (p.type === 'black') { ctx.fillStyle = "#2c2825"; }
+                ctx.beginPath(); 
+                if (p.type === 'white') { ctx.arc(p.x, p.y, 14, 0, Math.PI*2); ctx.fillStyle = "#fff"; ctx.shadowBlur = 8; ctx.shadowColor = "#fff"; ctx.fill(); }
+                else if (p.type === 'black') { ctx.arc(p.x, p.y, 14, 0, Math.PI*2); ctx.fillStyle = "#2c2825"; ctx.fill(); }
                 else if (p.type === 'mystery') { 
-                    ctx.strokeStyle = "#8b572a"; ctx.strokeRect(p.x-10, p.y-10, 20, 20); 
-                    ctx.fillStyle = "#8b572a"; ctx.font = "12px sans-serif"; ctx.fillText("?", p.x-4, p.y+4);
+                    ctx.strokeStyle = "#8b572a"; ctx.lineWidth = 1.5; ctx.strokeRect(p.x-10, p.y-10, 20, 20); 
+                    ctx.fillStyle = "#8b572a"; ctx.font = "bold 14px sans-serif"; ctx.fillText("?", p.x-4, p.y+5);
                 }
-                ctx.fill(); ctx.shadowBlur = 0;
+                else if (p.type === 'good') { 
+                    ctx.arc(p.x, p.y, 12, 0, Math.PI*2); ctx.strokeStyle = "#2a8b2a"; ctx.lineWidth = 2; ctx.stroke(); 
+                    ctx.fillStyle = "#2a8b2a"; ctx.font = "bold 16px sans-serif"; ctx.fillText("+", p.x-5, p.y+5);
+                    ctx.shadowBlur = 4; ctx.shadowColor = "#2a8b2a";
+                }
+                else if (p.type === 'bad') { 
+                    ctx.moveTo(p.x, p.y - 14); ctx.lineTo(p.x + 12, p.y + 10); ctx.lineTo(p.x - 12, p.y + 10); ctx.closePath();
+                    ctx.fillStyle = "#8b2a2a"; ctx.fill(); 
+                    ctx.fillStyle = "#fff"; ctx.font = "bold 16px sans-serif"; ctx.fillText("-", p.x-3, p.y+4);
+                    ctx.shadowBlur = 4; ctx.shadowColor = "#8b2a2a";
+                }
+                ctx.shadowBlur = 0;
             });
 
-            if (activeDrop && !isEnded) {
+            if (activeDrop && !isEnded && gameStarted) {
                 const elapsed = Date.now() - lastActionTime;
                 const timeLeft = Math.max(0, (AUTO_LIMIT - elapsed) / 1000);
                 
